@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 from pathlib import Path
@@ -9,11 +8,11 @@ import matplotlib.ticker as mticker
 # Configuración general de la aplicación
 # -------------------------------------------------
 st.set_page_config(
-    page_title="Simulador de plazo de recuperación - Vehículos Híbridos/Eléctricos",
+    page_title="Simulador de Plazo de Recuperación",
     layout="centered",
 )
 
-st.title("Simulador de plazo de recuperación - Vehículos Híbridos/Eléctricos")
+st.title("Simulador de Plazo de Recuperación")
 
 # -------------------------------------------------
 # Ruta del archivo Excel dentro del repositorio
@@ -73,16 +72,16 @@ nombre_gas = st.sidebar.selectbox(
     combustion_df["Nombre"],
 )
 nombre_elec = st.sidebar.selectbox(
-    "Auto eléctrico",
+    "Auto híbrido/eléctrico",
     electric_df["Nombre"],
 )
 
 st.sidebar.header("2. Parámetros de uso")
-KM_ANUALES = st.sidebar.slider("Kilómetros por año", 5_000, 40_000, 15_000, step=1_000)
+KM_ANUALES = st.sidebar.slider("Recorrido anual estimado (km)", 5_000, 40_000, 15_000, step=1_000)
 ANIOS = st.sidebar.slider("Horizonte de análisis (años)", 1, 15, 10)
 
 # Botón para activar el cálculo
-ejecutar = st.sidebar.button("Actualizar simulación")
+ejecutar = st.sidebar.button("Consultar")
 
 if ejecutar:
     # -------------------------------------------------
@@ -104,6 +103,11 @@ if ejecutar:
     if consumo_kwh_km <= 0 or pd.isna(consumo_kwh_km):
         st.error("El consumo (kWh/km) del vehículo eléctrico debe ser > 0.")
         st.stop()
+
+    # Mostrar los precios iniciales como indicadores (puedes quitar esta sección si no deseas mostrarla)
+    col1, col2 = st.columns(2)
+    col1.metric(f"Precio inicial - {nombre_gas}", f"${precio_gas_usd:,.0f}")
+    col2.metric(f"Precio inicial - {nombre_elec}", f"${precio_elec_usd:,.0f}")
 
     # -------------------------------------------------
     # Funciones de costo anual
@@ -137,32 +141,55 @@ if ejecutar:
     resultados_df = pd.DataFrame(resultados)
 
     # -------------------------------------------------
-    # Visualización personalizada con matplotlib
+    # Visualización interactiva
     # -------------------------------------------------
     st.subheader("Costos acumulados (USD)")
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(resultados_df["Año"], resultados_df[nombre_gas], label=nombre_gas, marker="o")
-    ax.plot(resultados_df["Año"], resultados_df[nombre_elec], label=nombre_elec, marker="o")
+    import plotly.graph_objects as go
 
-    ax.set_xlabel("Años")
-    ax.set_ylabel("Costo (USD)")
-    ax.set_title("Evolución de costos acumulados")
-    ax.legend()
-    ax.grid(True, linestyle="--", alpha=0.6)
-    ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=resultados_df["Año"],
+        y=resultados_df[nombre_gas],
+        mode='lines+markers',
+        name=nombre_gas,
+        marker=dict(size=5, color='#1f77b4')
+    ))
+    fig.add_trace(go.Scatter(
+        x=resultados_df["Año"],
+        y=resultados_df[nombre_elec],
+        mode='lines+markers',
+        name=nombre_elec,
+        marker=dict(size=5, color='#2ca02c')
+    ))
 
-    st.pyplot(fig)
+    fig.update_layout(
+        xaxis_title="Años",
+        yaxis_title="Costo (USD)",
+        hovermode="x unified",
+        template="plotly_white",
+        margin=dict(l=40, r=40, t=20, b=40),
+        showlegend=True,
+    )
+    fig.update_xaxes(tickformat="d")
+    fig.update_yaxes(tickformat=",.0f")
+
+    st.plotly_chart(fig, use_container_width=True)
 
     # Punto de equilibrio
-    breakeven_rows = resultados_df[resultados_df[nombre_elec] <= resultados_df[nombre_gas]]
-    if not breakeven_rows.empty:
-        anio_equilibrio = int(breakeven_rows.iloc[0]["Año"])
-        st.success(f"📌 El auto eléctrico alcanza el punto de equilibrio en el año {anio_equilibrio}.")
+    breakeven = resultados_df[resultados_df["Diferencia (USD)"] <= 0]
+    if not breakeven.empty:
+        x1 = breakeven.iloc[0 - 1]["Año"]
+        x2 = breakeven.iloc[0]["Año"]
+        y1 = breakeven.iloc[0 - 1]["Diferencia (USD)"]
+        y2 = breakeven.iloc[0]["Diferencia (USD)"]
+        pendiente = (y2 - y1) / (x2 - x1)
+        interseccion = x2 - (y2 / pendiente)
+        st.success(f"Se alcanza el punto de equilibrio en {interseccion:.1f} años.")
     else:
         st.info("❕ En el horizonte seleccionado, el auto eléctrico no alcanza el punto de equilibrio.")
 
     # Tabla detallada
-    with st.expander("Ver tabla de resultados"):
+    with st.expander("Tabla de resultados"):
         st.dataframe(resultados_df, use_container_width=True)
 else:
-    st.info("Usa el botón en la izquierda para ejecutar la simulación.")
+    st.info("Usa el botón de la izquierda para ejecutar la simulación.")
