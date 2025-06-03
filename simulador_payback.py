@@ -105,10 +105,18 @@ if ejecutar:
         st.error("El consumo (kWh/km) del vehículo eléctrico debe ser > 0.")
         st.stop()
 
-    # Mostrar los precios iniciales como indicadores (puedes quitar esta sección si no deseas mostrarla)
-    col1, col2 = st.columns(2)
-    col1.metric(f"Precio inicial - {nombre_gas}", f"${precio_gas_usd:,.0f}")
-    col2.metric(f"Precio inicial - {nombre_elec}", f"${precio_elec_usd:,.0f}")
+    # Mostrar los precios iniciales como indicadores (quitar esta sección en caso esté muy saturada la página)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+    st.markdown(
+        f"""
+        <div style='text-align: center; font-size: 0.7em;'>
+            <strong>Precio inicial - {nombre_gas}:</strong> ${precio_gas_usd:,.0f} &nbsp;&nbsp;&nbsp;
+            <strong>{nombre_elec}:</strong> ${precio_elec_usd:,.0f}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     # -------------------------------------------------
     # Funciones de costo anual
@@ -144,7 +152,7 @@ if ejecutar:
     # -------------------------------------------------
     # Visualización interactiva
     # -------------------------------------------------
-    st.subheader("Costos acumulados (USD)")
+    st.subheader("Evolucion de costos acumulados")
     import plotly.graph_objects as go
 
     fig = go.Figure()
