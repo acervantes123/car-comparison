@@ -111,8 +111,8 @@ if ejecutar:
         st.markdown(
         f"""
         <div style='text-align: center; font-size: 0.8em;'>
-            <strong>Precio inicial - {nombre_gas}:</strong> ${precio_gas_usd:,.0f} &nbsp;&nbsp;&nbsp;
-            <strong>{nombre_elec}:</strong> ${precio_elec_usd:,.0f}
+            <strong>MSRP - {nombre_gas}:</strong> ${precio_gas_usd:,.0f} &nbsp;&nbsp;&nbsp;
+            <strong>MSRP - {nombre_elec}:</strong> ${precio_elec_usd:,.0f}
         </div>
         """,
         unsafe_allow_html=True
