@@ -2,106 +2,151 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 
-# -------------------------------
-# Configuración general
-# -------------------------------
-st.set_page_config(page_title="Simulador de Payback", page_icon="🚗", layout="centered")
-st.title("📈 Simulador de Payback: Eléctrico vs Combustión")
+# -------------------------------------------------
+# Configuración general de la aplicación
+# -------------------------------------------------
+st.set_page_config(
+    page_title="Simulador de Payback – Eléctrico vs Combustión",
+    page_icon="🚗",
+    layout="centered",
+)
 
-# -------------------------------
-# Cargar datos desde Excel
-# -------------------------------
+st.title("📈 Simulador de Payback: Auto Eléctrico vs. Auto a Gasolina")
 
-def cargar_datos_excel(ruta_excel):
-    xls = pd.ExcelFile(ruta_excel)
+# -------------------------------------------------
+# Ruta del archivo Excel dentro del repositorio
+# -------------------------------------------------
+DATA_FILE = Path(__file__).parent / "DB_Car comparison.xlsx"
+
+@st.cache_data(show_spinner="Cargando base de datos …")
+def cargar_datos(path: Path):
+    """Carga las hojas 'Vehículos' y 'Configuración' del Excel."""
+    xls = pd.ExcelFile(path)
     vehiculos = xls.parse("Vehículos")
-    config = xls.parse("Configuración")
+    config = (
+        xls.parse("Configuración")
+        .set_index("Parámetro")
+        ["Valor"]
+        .to_dict()
+    )
     return vehiculos, config
 
-ruta_excel = st.file_uploader("Sube el archivo de datos", type=[".xlsx"])
+# Comprobar que el archivo existe
+if not DATA_FILE.exists():
+    st.error(
+        f"No se encontró el archivo de datos: {DATA_FILE}. "
+        "Asegúrate de clonar el repositorio completo o de colocar el Excel en la misma carpeta que este script."
+    )
+    st.stop()
 
-if ruta_excel is not None:
-    vehiculos_df, config_df = cargar_datos_excel(ruta_excel)
+vehiculos_df, config = cargar_datos(DATA_FILE)
 
-    # -------------------------------
-    # Extraer configuración
-    # -------------------------------
-    config_dict = config_df.set_index("Parámetro").to_dict()["Valor"]
-    tipo_cambio = config_dict.get("Tipo de cambio (S/ a USD)", 3.75)
-    precio_gasolina = config_dict.get("Costo gasolina (PEN/gal)", 15.99)
-    precio_electricidad = config_dict.get("Costo electricidad (PEN/kWh)", 0.5634)
+# -------------------------------------------------
+# Parámetros globales desde la hoja Configuración
+# -------------------------------------------------
+TIPO_CAMBIO = config.get("Tipo de cambio (S/ a USD)", 3.75)
+PRECIO_GASOLINA = config.get("Costo gasolina (PEN/gal)", 15.99)
+PRECIO_ELECTRICIDAD = config.get("Costo electricidad (PEN/kWh)", 0.5634)
+LITROS_POR_GALON = 3.78541
 
-    # -------------------------------
-    # Separar vehículos por tipo
-    # -------------------------------
-    autos_combustion = vehiculos_df[vehiculos_df["Tipo"] == "Combustión"]
-    autos_electricos = vehiculos_df[vehiculos_df["Tipo"] == "Eléctrico"]
+# -------------------------------------------------
+# Preparar los dataframes de autos
+# -------------------------------------------------
+vehiculos_df["Nombre"] = vehiculos_df["Marca"].str.strip() + " " + vehiculos_df["Modelo"].str.strip()
 
-    # -------------------------------
-    # Selección de autos
-    # -------------------------------
-    st.sidebar.header("1. Selecciona los modelos")
+combustion_df = vehiculos_df[vehiculos_df["Tipo"] == "Combustión"].copy()
+electric_df = vehiculos_df[vehiculos_df["Tipo"] == "Eléctrico"].copy()
 
-    auto_gas = st.sidebar.selectbox("Auto a gasolina", autos_combustion["Marca"])
-    auto_elec = st.sidebar.selectbox("Auto eléctrico", autos_electricos["Marca"])
+if combustion_df.empty or electric_df.empty:
+    st.error("La base de datos debe contener al menos un vehículo de combustión y uno eléctrico.")
+    st.stop()
 
-    # -------------------------------
-    # Parámetros de simulación
-    # -------------------------------
-    st.sidebar.header("2. Parámetros de uso")
-    km_anuales = st.sidebar.slider("Kilómetros por año", 5000, 40000, 15000, step=1000)
-    años = st.sidebar.slider("Años de análisis", 1, 15, 10)
+# -------------------------------------------------
+# Sidebar – selección de autos y parámetros de uso
+# -------------------------------------------------
+st.sidebar.header("1. Selecciona los modelos para comparar")
 
-    # -------------------------------
-    # Extraer datos de cada auto
-    # -------------------------------
-    datos_gas = autos_combustion[vehiculos_df["Marca"] == auto_gas].iloc[0]
-    datos_elec = autos_electricos[vehiculos_df["Marca"] == auto_elec].iloc[0]
+nombre_gas = st.sidebar.selectbox(
+    "Auto a gasolina",
+    combustion_df["Nombre"],
+)
+nombre_elec = st.sidebar.selectbox(
+    "Auto eléctrico",
+    electric_df["Nombre"],
+)
 
-    precio_gas = datos_gas["Precio USD"] * tipo_cambio
-    precio_elec = datos_elec["Precio USD"] * tipo_cambio
+st.sidebar.header("2. Parámetros de uso")
+KM_ANUALES = st.sidebar.slider("Kilómetros por año", 5_000, 40_000, 15_000, step=1_000)
+ANIOS = st.sidebar.slider("Horizonte de análisis (años)", 1, 15, 10)
 
-    consumo_gas_km_l = datos_gas["Consumo (km/l)"]
-    consumo_elec_kwh_km = datos_elec["Consumo (kWh/km)"]
+# -------------------------------------------------
+# Extraer la fila correspondiente a cada vehículo
+# -------------------------------------------------
+row_gas = combustion_df[combustion_df["Nombre"] == nombre_gas].iloc[0]
+row_elec = electric_df[electric_df["Nombre"] == nombre_elec].iloc[0]
 
-    galon_litros = 3.78541
-    costo_combustible_anual = lambda km: (km / consumo_gas_km_l) * (precio_gasolina / galon_litros)
-    costo_electrico_anual = lambda km: km * consumo_elec_kwh_km * precio_electricidad
+precio_gas_soles = row_gas["Precio (USD)"] * TIPO_CAMBIO
+precio_elec_soles = row_elec["Precio (USD)"] * TIPO_CAMBIO
 
-    # -------------------------------
-    # Calcular costos acumulados
-    # -------------------------------
-    costos = []
-    total_gas = precio_gas
-    total_elec = precio_elec
+consumo_km_l = row_gas["Consumo (km/l)"]
+consumo_kwh_km = row_elec["Consumo (kWh/km)"]
 
-    for año in range(años + 1):
-        if año > 0:
-            total_gas += costo_combustible_anual(km_anuales)
-            total_elec += costo_electrico_anual(km_anuales)
-        costos.append({
-            "Año": año,
-            auto_gas: total_gas,
-            auto_elec: total_elec,
-            "Diferencia acumulada (S/)": total_gas - total_elec
-        })
+# Validaciones básicas
+if consumo_km_l <= 0 or pd.isna(consumo_km_l):
+    st.error("El consumo (km/l) del vehículo a gasolina debe ser > 0.")
+    st.stop()
+if consumo_kwh_km <= 0 or pd.isna(consumo_kwh_km):
+    st.error("El consumo (kWh/km) del vehículo eléctrico debe ser > 0.")
+    st.stop()
 
-    df_resultados = pd.DataFrame(costos)
+# -------------------------------------------------
+# Funciones de costo anual
+# -------------------------------------------------
 
-    # -------------------------------
-    # Mostrar resultados
-    # -------------------------------
-    st.subheader("Comparación de costos acumulados")
-    st.line_chart(df_resultados.set_index("Año")[[auto_gas, auto_elec]])
+def costo_anual_gasolina(km):
+    litros_consumidos = km / consumo_km_l
+    costo_litro = PRECIO_GASOLINA / LITROS_POR_GALON
+    return litros_consumidos * costo_litro
 
-    breakeven = df_resultados[df_resultados[auto_elec] <= df_resultados[auto_gas]]
-    if not breakeven.empty:
-        año_equilibrio = int(breakeven.iloc[0]["Año"])
-        st.success(f"📌 El punto de equilibrio se alcanza en el año {año_equilibrio}.")
-    else:
-        st.info("❕ Dentro del horizonte seleccionado, el auto eléctrico no alcanza el punto de equilibrio.")
 
-    with st.expander("Ver tabla de resultados"):
-        st.dataframe(df_resultados, use_container_width=True)
+def costo_anual_electrico(km):
+    return km * consumo_kwh_km * PRECIO_ELECTRICIDAD
+
+# -------------------------------------------------
+# Calcular costos acumulados
+# -------------------------------------------------
+resultados = []
+costo_acum_gas = precio_gas_soles
+costo_acum_elec = precio_elec_soles
+
+for anio in range(ANIOS + 1):
+    if anio > 0:
+        costo_acum_gas += costo_anual_gasolina(KM_ANUALES)
+        costo_acum_elec += costo_anual_electrico(KM_ANUALES)
+    resultados.append({
+        "Año": anio,
+        nombre_gas: round(costo_acum_gas, 2),
+        nombre_elec: round(costo_acum_elec, 2),
+        "Diferencia (S/)": round(costo_acum_gas - costo_acum_elec, 2),
+    })
+
+resultados_df = pd.DataFrame(resultados)
+
+# -------------------------------------------------
+# Visualización
+# -------------------------------------------------
+st.subheader("Costos acumulados")
+st.line_chart(resultados_df.set_index("Año")[[nombre_gas, nombre_elec]])
+
+# Punto de equilibrio
+breakeven_rows = resultados_df[resultados_df[nombre_elec] <= resultados_df[nombre_gas]]
+if not breakeven_rows.empty:
+    anio_equilibrio = int(breakeven_rows.iloc[0]["Año"])
+    st.success(f"📌 El auto eléctrico alcanza el punto de equilibrio en el año {anio_equilibrio}.")
 else:
-    st.info("Por favor, sube el archivo Excel con las hojas 'Vehículos' y 'Configuración'.")
+    st.info("❕ En el horizonte seleccionado, el auto eléctrico no alcanza el punto de equilibrio.")
+
+# Tabla detallada
+with st.expander("Ver tabla de resultados"):
+    st.dataframe(resultados_df, use_container_width=True)
+
