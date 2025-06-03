@@ -113,7 +113,7 @@ if ejecutar:
     # Mostrar indicadores compactos de precio
     # -------------------------------------------------
 col1, col2, col3 = st.columns([1, 1, 1])
-with col1:
+    with col1:
     st.markdown(
         f"""
         <div style='text-align: center; font-size: 0.75em; line-height:1.3;'>
@@ -123,7 +123,7 @@ with col1:
         """,
         unsafe_allow_html=True
     )
-with col2:
+    with col2:
     st.markdown(
         f"""
         <div style='text-align: center; font-size: 0.75em; line-height:1.3;'>
