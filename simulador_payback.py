@@ -108,7 +108,7 @@ if ejecutar:
     # Mostrar los precios iniciales como indicadores (quitar esta sección en caso esté muy saturada la página)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-    st.markdown(
+        st.markdown(
         f"""
         <div style='text-align: center; font-size: 0.7em;'>
             <strong>Precio inicial - {nombre_gas}:</strong> ${precio_gas_usd:,.0f} &nbsp;&nbsp;&nbsp;
