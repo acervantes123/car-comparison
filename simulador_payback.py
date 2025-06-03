@@ -81,6 +81,8 @@ st.sidebar.header("2. Parámetros de uso")
 KM_ANUALES = st.sidebar.slider("Recorrido anual estimado (km)", 5_000, 40_000, 15_000, step=1_000)
 ANIOS = st.sidebar.slider("Horizonte de análisis (años)", 1, 15, 10)
 
+INCLUIR_IGV = st.sidebar.checkbox("Aplicar incentivo: eliminación de IGV (18%)", value=False)
+
 # Botón para activar el cálculo
 ejecutar = st.sidebar.button("Consultar")
 
@@ -93,6 +95,8 @@ if ejecutar:
 
     precio_gas_usd = row_gas["Precio (USD)"]
     precio_elec_usd = row_elec["Precio (USD)"]
+    if INCLUIR_IGV:
+        precio_elec_usd *= 0.82  # Aplica descuento de 18%
 
     consumo_km_l = row_gas["Consumo (km/l)"]
     consumo_kwh_km = row_elec["Consumo (kWh/km)"]
@@ -111,8 +115,8 @@ if ejecutar:
         st.markdown(
         f"""
         <div style='text-align: center; font-size: 0.8em;'>
-            <strong>MSRP - {nombre_gas}:</strong> ${precio_gas_usd:,.0f} &nbsp;&nbsp;&nbsp;
-            <strong>MSRP - {nombre_elec}:</strong> ${precio_elec_usd:,.0f}
+            <strong> MSRP - {nombre_gas}:</strong> ${precio_gas_usd:,.0f} &nbsp;&nbsp;&nbsp;
+            <strong> MSRP - {nombre_elec}:</strong> ${precio_elec_usd:,.0f}
         </div>
         """,
         unsafe_allow_html=True
