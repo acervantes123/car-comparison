@@ -110,7 +110,7 @@ if ejecutar:
     with col2:
         st.markdown(
         f"""
-        <div style='text-align: center; font-size: 0.7em;'>
+        <div style='text-align: center; font-size: 0.9em;'>
             <strong>Precio inicial - {nombre_gas}:</strong> ${precio_gas_usd:,.0f} &nbsp;&nbsp;&nbsp;
             <strong>{nombre_elec}:</strong> ${precio_elec_usd:,.0f}
         </div>
