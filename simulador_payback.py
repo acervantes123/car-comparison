@@ -88,20 +88,20 @@ ejecutar = st.sidebar.button("Consultar")
 
 if ejecutar:
     # -------------------------------------------------
-    # Extraer la fila correspondiente a cada vehículo
+    # Extraer los datos de los autos seleccionados
     # -------------------------------------------------
     row_gas = combustion_df[combustion_df["Nombre"] == nombre_gas].iloc[0]
     row_elec = electric_df[electric_df["Nombre"] == nombre_elec].iloc[0]
 
     precio_gas_usd = row_gas["Precio (USD)"]
-    precio_elec_usd = row_elec["Precio (USD)"]
-    if INCLUIR_IGV:
-        precio_elec_usd *= 0.82  # Aplica descuento de 18%
+    precio_elec_usd_base = row_elec["Precio (USD)"]
+    precio_elec_usd = precio_elec_usd_base * 0.82 if INCLUIR_IGV else precio_elec_usd_base
+    nombre_elec_full = f"{nombre_elec} (con incentivo)" if INCLUIR_IGV else nombre_elec
 
     consumo_km_l = row_gas["Consumo (km/l)"]
     consumo_kwh_km = row_elec["Consumo (kWh/km)"]
 
-    # Validaciones básicas
+    # Validaciones
     if consumo_km_l <= 0 or pd.isna(consumo_km_l):
         st.error("El consumo (km/l) del vehículo a gasolina debe ser > 0.")
         st.stop()
@@ -109,21 +109,23 @@ if ejecutar:
         st.error("El consumo (kWh/km) del vehículo eléctrico debe ser > 0.")
         st.stop()
 
-    # Mostrar los precios iniciales como indicadores (quitar esta sección en caso esté muy saturada la página)
+    # -------------------------------------------------
+    # Mostrar indicadores compactos de precio
+    # -------------------------------------------------
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown(
-        f"""
-        <div style='text-align: center; font-size: 0.8em;'>
-            <strong> MSRP - {nombre_gas}:</strong> ${precio_gas_usd:,.0f} &nbsp;&nbsp;&nbsp;
-            <strong> MSRP - {nombre_elec}:</strong> ${precio_elec_usd:,.0f}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+            f"""
+            <div style='text-align: center; font-size: 0.56em; line-height:1.3;'>
+                <div><strong>{nombre_gas}</strong><br/>Precio inicial: ${precio_gas_usd:,.0f}</div><br/>
+                <div><strong>{nombre_elec_full}</strong><br/>Precio inicial: ${precio_elec_usd_base:,.0f} → ${precio_elec_usd:,.0f}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
     # -------------------------------------------------
-    # Funciones de costo anual
+    # Funciones de costos anuales
     # -------------------------------------------------
     def costo_anual_gasolina(km):
         litros_consumidos = km / consumo_km_l
@@ -134,7 +136,7 @@ if ejecutar:
         return (km * consumo_kwh_km * PRECIO_ELECTRICIDAD) / TIPO_CAMBIO
 
     # -------------------------------------------------
-    # Calcular costos acumulados
+    # Calcular costos acumulados año a año
     # -------------------------------------------------
     resultados = []
     costo_acum_gas = precio_gas_usd
@@ -147,17 +149,16 @@ if ejecutar:
         resultados.append({
             "Año": anio,
             nombre_gas: round(costo_acum_gas, 2),
-            nombre_elec: round(costo_acum_elec, 2),
+            nombre_elec_full: round(costo_acum_elec, 2),
             "Diferencia (USD)": round(costo_acum_gas - costo_acum_elec, 2),
         })
 
     resultados_df = pd.DataFrame(resultados)
 
     # -------------------------------------------------
-    # Visualización interactiva
+    # Gráfico interactivo
     # -------------------------------------------------
-    st.subheader("Evolucion de costos acumulados")
-    import plotly.graph_objects as go
+    st.subheader("Costos acumulados (USD)")
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(
@@ -169,9 +170,9 @@ if ejecutar:
     ))
     fig.add_trace(go.Scatter(
         x=resultados_df["Año"],
-        y=resultados_df[nombre_elec],
+        y=resultados_df[nombre_elec_full],
         mode='lines+markers',
-        name=nombre_elec,
+        name=nombre_elec_full,
         marker=dict(size=5, color='#2ca02c')
     ))
 
@@ -188,7 +189,9 @@ if ejecutar:
 
     st.plotly_chart(fig, use_container_width=True)
 
-    # Punto de equilibrio
+    # -------------------------------------------------
+    # Cálculo del punto de equilibrio
+    # -------------------------------------------------
     breakeven = resultados_df[resultados_df["Diferencia (USD)"] <= 0]
     if not breakeven.empty:
         x1 = breakeven.iloc[0 - 1]["Año"]
@@ -201,7 +204,9 @@ if ejecutar:
     else:
         st.info("❕ En el horizonte seleccionado, el auto eléctrico no alcanza el punto de equilibrio.")
 
-    # Tabla detallada
+    # -------------------------------------------------
+    # Mostrar tabla de resultados
+    # -------------------------------------------------
     with st.expander("Tabla de resultados"):
         st.dataframe(resultados_df, use_container_width=True)
 else:
