@@ -114,25 +114,25 @@ if ejecutar:
     # -------------------------------------------------
 col1, col2, col3 = st.columns([1, 1, 1])
     with col1:
-    st.markdown(
-        f"""
-        <div style='text-align: center; font-size: 0.75em; line-height:1.3;'>
-            <strong>{nombre_gas}</strong><br/>
-            MSRP: ${precio_gas_usd:,.0f}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+        st.markdown(
+            f"""
+            <div style='text-align: center; font-size: 0.75em; line-height:1.3;'>
+                <strong>{nombre_gas}</strong><br/>
+                MSRP: ${precio_gas_usd:,.0f}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
     with col2:
-    st.markdown(
-        f"""
-        <div style='text-align: center; font-size: 0.75em; line-height:1.3;'>
-            <strong>{nombre_elec_full}</strong><br/>
-            MSRP: ${precio_elec_usd:,.0f}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+        st.markdown(
+            f"""
+            <div style='text-align: center; font-size: 0.75em; line-height:1.3;'>
+                <strong>{nombre_elec_full}</strong><br/>
+                MSRP: ${precio_elec_usd:,.0f}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
     # -------------------------------------------------
     # Funciones de costos anuales
     # -------------------------------------------------
