@@ -1,17 +1,19 @@
+
 import streamlit as st
 import pandas as pd
 from pathlib import Path
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 
 # -------------------------------------------------
 # Configuración general de la aplicación
 # -------------------------------------------------
 st.set_page_config(
-    page_title="Simulador de Payback – Eléctrico vs Combustión",
-    page_icon="🚗",
+    page_title="Simulador de plazo de recuperación - Vehículos Híbridos/Eléctricos",
     layout="centered",
 )
 
-st.title("📈 Simulador de Payback: Auto Eléctrico vs. Auto a Gasolina")
+st.title("Simulador de plazo de recuperación - Vehículos Híbridos/Eléctricos")
 
 # -------------------------------------------------
 # Ruta del archivo Excel dentro del repositorio
@@ -79,74 +81,88 @@ st.sidebar.header("2. Parámetros de uso")
 KM_ANUALES = st.sidebar.slider("Kilómetros por año", 5_000, 40_000, 15_000, step=1_000)
 ANIOS = st.sidebar.slider("Horizonte de análisis (años)", 1, 15, 10)
 
-# -------------------------------------------------
-# Extraer la fila correspondiente a cada vehículo
-# -------------------------------------------------
-row_gas = combustion_df[combustion_df["Nombre"] == nombre_gas].iloc[0]
-row_elec = electric_df[electric_df["Nombre"] == nombre_elec].iloc[0]
+# Botón para activar el cálculo
+ejecutar = st.sidebar.button("Actualizar simulación")
 
-precio_gas_soles = row_gas["Precio (USD)"] * TIPO_CAMBIO
-precio_elec_soles = row_elec["Precio (USD)"] * TIPO_CAMBIO
+if ejecutar:
+    # -------------------------------------------------
+    # Extraer la fila correspondiente a cada vehículo
+    # -------------------------------------------------
+    row_gas = combustion_df[combustion_df["Nombre"] == nombre_gas].iloc[0]
+    row_elec = electric_df[electric_df["Nombre"] == nombre_elec].iloc[0]
 
-consumo_km_l = row_gas["Consumo (km/l)"]
-consumo_kwh_km = row_elec["Consumo (kWh/km)"]
+    precio_gas_usd = row_gas["Precio (USD)"]
+    precio_elec_usd = row_elec["Precio (USD)"]
 
-# Validaciones básicas
-if consumo_km_l <= 0 or pd.isna(consumo_km_l):
-    st.error("El consumo (km/l) del vehículo a gasolina debe ser > 0.")
-    st.stop()
-if consumo_kwh_km <= 0 or pd.isna(consumo_kwh_km):
-    st.error("El consumo (kWh/km) del vehículo eléctrico debe ser > 0.")
-    st.stop()
+    consumo_km_l = row_gas["Consumo (km/l)"]
+    consumo_kwh_km = row_elec["Consumo (kWh/km)"]
 
-# -------------------------------------------------
-# Funciones de costo anual
-# -------------------------------------------------
+    # Validaciones básicas
+    if consumo_km_l <= 0 or pd.isna(consumo_km_l):
+        st.error("El consumo (km/l) del vehículo a gasolina debe ser > 0.")
+        st.stop()
+    if consumo_kwh_km <= 0 or pd.isna(consumo_kwh_km):
+        st.error("El consumo (kWh/km) del vehículo eléctrico debe ser > 0.")
+        st.stop()
 
-def costo_anual_gasolina(km):
-    litros_consumidos = km / consumo_km_l
-    costo_litro = PRECIO_GASOLINA / LITROS_POR_GALON
-    return litros_consumidos * costo_litro
+    # -------------------------------------------------
+    # Funciones de costo anual
+    # -------------------------------------------------
+    def costo_anual_gasolina(km):
+        litros_consumidos = km / consumo_km_l
+        costo_litro = PRECIO_GASOLINA / LITROS_POR_GALON
+        return litros_consumidos * costo_litro / TIPO_CAMBIO
 
+    def costo_anual_electrico(km):
+        return (km * consumo_kwh_km * PRECIO_ELECTRICIDAD) / TIPO_CAMBIO
 
-def costo_anual_electrico(km):
-    return km * consumo_kwh_km * PRECIO_ELECTRICIDAD
+    # -------------------------------------------------
+    # Calcular costos acumulados
+    # -------------------------------------------------
+    resultados = []
+    costo_acum_gas = precio_gas_usd
+    costo_acum_elec = precio_elec_usd
 
-# -------------------------------------------------
-# Calcular costos acumulados
-# -------------------------------------------------
-resultados = []
-costo_acum_gas = precio_gas_soles
-costo_acum_elec = precio_elec_soles
+    for anio in range(ANIOS + 1):
+        if anio > 0:
+            costo_acum_gas += costo_anual_gasolina(KM_ANUALES)
+            costo_acum_elec += costo_anual_electrico(KM_ANUALES)
+        resultados.append({
+            "Año": anio,
+            nombre_gas: round(costo_acum_gas, 2),
+            nombre_elec: round(costo_acum_elec, 2),
+            "Diferencia (USD)": round(costo_acum_gas - costo_acum_elec, 2),
+        })
 
-for anio in range(ANIOS + 1):
-    if anio > 0:
-        costo_acum_gas += costo_anual_gasolina(KM_ANUALES)
-        costo_acum_elec += costo_anual_electrico(KM_ANUALES)
-    resultados.append({
-        "Año": anio,
-        nombre_gas: round(costo_acum_gas, 2),
-        nombre_elec: round(costo_acum_elec, 2),
-        "Diferencia (S/)": round(costo_acum_gas - costo_acum_elec, 2),
-    })
+    resultados_df = pd.DataFrame(resultados)
 
-resultados_df = pd.DataFrame(resultados)
+    # -------------------------------------------------
+    # Visualización personalizada con matplotlib
+    # -------------------------------------------------
+    st.subheader("Costos acumulados (USD)")
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot(resultados_df["Año"], resultados_df[nombre_gas], label=nombre_gas, marker="o")
+    ax.plot(resultados_df["Año"], resultados_df[nombre_elec], label=nombre_elec, marker="o")
 
-# -------------------------------------------------
-# Visualización
-# -------------------------------------------------
-st.subheader("Costos acumulados")
-st.line_chart(resultados_df.set_index("Año")[[nombre_gas, nombre_elec]])
+    ax.set_xlabel("Años")
+    ax.set_ylabel("Costo (USD)")
+    ax.set_title("Evolución de costos acumulados")
+    ax.legend()
+    ax.grid(True, linestyle="--", alpha=0.6)
+    ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
 
-# Punto de equilibrio
-breakeven_rows = resultados_df[resultados_df[nombre_elec] <= resultados_df[nombre_gas]]
-if not breakeven_rows.empty:
-    anio_equilibrio = int(breakeven_rows.iloc[0]["Año"])
-    st.success(f"📌 El auto eléctrico alcanza el punto de equilibrio en el año {anio_equilibrio}.")
+    st.pyplot(fig)
+
+    # Punto de equilibrio
+    breakeven_rows = resultados_df[resultados_df[nombre_elec] <= resultados_df[nombre_gas]]
+    if not breakeven_rows.empty:
+        anio_equilibrio = int(breakeven_rows.iloc[0]["Año"])
+        st.success(f"📌 El auto eléctrico alcanza el punto de equilibrio en el año {anio_equilibrio}.")
+    else:
+        st.info("❕ En el horizonte seleccionado, el auto eléctrico no alcanza el punto de equilibrio.")
+
+    # Tabla detallada
+    with st.expander("Ver tabla de resultados"):
+        st.dataframe(resultados_df, use_container_width=True)
 else:
-    st.info("❕ En el horizonte seleccionado, el auto eléctrico no alcanza el punto de equilibrio.")
-
-# Tabla detallada
-with st.expander("Ver tabla de resultados"):
-    st.dataframe(resultados_df, use_container_width=True)
-
+    st.info("Usa el botón en la izquierda para ejecutar la simulación.")
