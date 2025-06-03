@@ -81,7 +81,7 @@ st.sidebar.header("2. Parámetros de uso")
 KM_ANUALES = st.sidebar.slider("Recorrido anual estimado (km)", 5_000, 40_000, 15_000, step=1_000)
 ANIOS = st.sidebar.slider("Horizonte de análisis (años)", 1, 15, 10)
 
-INCLUIR_IGV = st.sidebar.checkbox("Aplicar incentivo: eliminación de IGV (18%)", value=False)
+INCLUIR_IGV = st.sidebar.checkbox("Incentivo: Eliminación de IGV (18%)", value=False)
 
 # Botón para activar el cálculo
 ejecutar = st.sidebar.button("Consultar")
@@ -116,9 +116,9 @@ if ejecutar:
     with col2:
         st.markdown(
             f"""
-            <div style='text-align: center; font-size: 0.56em; line-height:1.3;'>
-                <div><strong>{nombre_gas}</strong><br/>Precio inicial: ${precio_gas_usd:,.0f}</div><br/>
-                <div><strong>{nombre_elec_full}</strong><br/>Precio inicial: ${precio_elec_usd_base:,.0f} → ${precio_elec_usd:,.0f}</div>
+            <div style='text-align: center; font-size: 0.oem; line-height:1.3;'>
+                <div><strong>{nombre_gas}</strong><br/>MSRP: ${precio_gas_usd:,.0f}</div><br/>
+                <div><strong>{nombre_elec_full}</strong><br/>MSRP: ${precio_elec_usd:,.0f}</div>
             </div>
             """,
             unsafe_allow_html=True
